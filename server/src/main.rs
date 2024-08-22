@@ -187,6 +187,11 @@ async fn code(code: &str, db: &State<SqlitePool>) -> Redirect {
   }
 }
 
+#[get("/")]
+async fn root() -> Redirect {
+  Redirect::to(uri!("https://google.com/"))
+}
+
 #[catch(default)]
 fn default_catcher(status: Status, _request: &Request) -> Json<ShortenerResult> {
   Json(ShortenerResult {
@@ -228,5 +233,5 @@ async fn rocket() -> _ {
   rocket::custom(figment)
     .manage(db)
     .register("/", catchers![default_catcher])
-    .mount("/", routes![code, add, new])
+    .mount("/", routes![code, add, new, root])
 }
