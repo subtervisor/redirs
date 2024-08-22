@@ -1,0 +1,6 @@
+CREATE TABLE urls (
+  id VARCHAR(4) PRIMARY KEY NOT NULL,
+  url TEXT NOT NULL,
+  creator INTEGER,
+  FOREIGN KEY(creator) REFERENCES admins(id) ON DELETE SET NULL
+)
