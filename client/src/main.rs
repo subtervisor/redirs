@@ -111,7 +111,10 @@ fn main() -> Result<()> {
   } else {
     RedirsConfig::default()
   };
-  debug!("Loaded config: {:?}", config);
+  debug!(
+    "Loaded config: {}",
+    serde_json::to_string(&config).context("Failed to encode config JSON")?
+  );
   if args.global_opts.host.is_some() {
     config.host = args.global_opts.host;
   }
@@ -125,7 +128,10 @@ fn main() -> Result<()> {
     config.uid = None;
     config.key = None;
   }
-  debug!("Runtime config: {:?}", config);
+  debug!(
+    "Runtime config: {}",
+    serde_json::to_string(&config).context("Failed to encode config JSON")?
+  );
 
   if config.host.is_none() {
     error!("No host specified.");
@@ -227,7 +233,7 @@ fn main() -> Result<()> {
           println!("Registered!");
         } else {
           println!(
-            "{:?}",
+            "{}",
             serde_json::to_string(&config).context("Failed to encode config JSON")?
           );
         }
