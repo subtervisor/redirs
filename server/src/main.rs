@@ -142,7 +142,7 @@ async fn list(
 
     let mut urls = sqlx::query_as!(
     RawShortenerEntry,
-    "SELECT urls.id, urls.url, admins.name as creator, urls.created FROM urls INNER JOIN admins ON urls.creator=admins.id ORDER BY urls.created LIMIT ? OFFSET ?",
+    "SELECT urls.id, urls.url, admins.name as creator, urls.created FROM urls INNER JOIN admins ON urls.creator=admins.id ORDER BY urls.created DESC LIMIT ? OFFSET ?",
     request.limit,
     request.offset
   )
