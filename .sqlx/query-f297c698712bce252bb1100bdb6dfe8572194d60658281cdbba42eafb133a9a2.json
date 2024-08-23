@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT urls.id, urls.url, admins.name as creator, urls.created FROM urls INNER JOIN admins ON urls.creator=admins.id ORDER BY urls.created DESC LIMIT ? OFFSET ?",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "url",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "creator",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "created",
+        "ordinal": 3,
+        "type_info": "Datetime"
+      }
+    ],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "f297c698712bce252bb1100bdb6dfe8572194d60658281cdbba42eafb133a9a2"
+}
