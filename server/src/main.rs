@@ -11,6 +11,7 @@ use rocket::{http::Status, response::Redirect, Request, State};
 use rocket_governor::{Method, Quota, RocketGovernable, RocketGovernor};
 use sqlx::{migrate::Migrator, sqlite::SqlitePool, Sqlite};
 use std::path::PathBuf;
+use std::str::FromStr;
 use tracing::{debug, error};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
@@ -49,11 +50,43 @@ struct RegistrationRequest<'r> {
   signature: Option<Signature>,
 }
 
+// List entries
+#[derive(Deserialize)]
+#[serde(crate = "rocket::serde")]
+struct LookupRequest {
+  uid: i64,
+  limit: u32,
+  offset: u32,
+  signature: Signature,
+}
+
 #[derive(Serialize)]
 #[serde(crate = "rocket::serde")]
 struct ShortenerResult {
   status: String,
   result: String,
+}
+
+struct RawShortenerEntry {
+  id: String,
+  url: String,
+  creator: String,
+  created: sqlx::types::chrono::NaiveDateTime,
+}
+
+#[derive(Serialize)]
+#[serde(crate = "rocket::serde")]
+struct ShortenerEntry {
+  id: String,
+  url: url::Url,
+  creator: String,
+  created: String,
+}
+
+#[derive(Serialize)]
+#[serde(crate = "rocket::serde")]
+struct ShortenerEntries {
+  entries: Vec<ShortenerEntry>,
 }
 
 pub struct RateLimitGuard;
@@ -91,6 +124,53 @@ async fn validate(
   pubkey
     .verify(payload, signature)
     .map_err(|_| Status::Unauthorized)
+}
+
+#[post("/api/list", format = "json", data = "<request>")]
+async fn list(
+  request: Json<LookupRequest>,
+  db: &State<SqlitePool>,
+  _limitguard: RocketGovernor<'_, RateLimitGuard>,
+) -> Result<Json<ShortenerEntries>, Status> {
+  let mut payload_bytes = request.limit.to_be_bytes().to_vec();
+  payload_bytes.append(&mut request.offset.to_be_bytes().to_vec());
+  validate(db, request.uid, &payload_bytes, &request.signature).await?;
+
+  if request.limit == 0 || request.offset == 0 {
+    return Err(Status::BadRequest);
+  }
+
+  let mut urls = sqlx::query_as!(
+    RawShortenerEntry,
+    "SELECT urls.id, urls.url, admins.name as creator, urls.created FROM urls INNER JOIN admins ON urls.creator=admins.id ORDER BY urls.created LIMIT ? OFFSET ?",
+    request.limit,
+    request.offset
+  )
+  .fetch_all(&**db)
+  .await
+  .context("Failed to execute lookup query")
+  .map_err(|e| {
+      error!("Failed to list entries: {}", e);
+      Status::InternalServerError
+  })?;
+
+  Ok(Json(ShortenerEntries {
+    entries: urls
+      .drain(..)
+      .map(|re| -> Result<ShortenerEntry> {
+        Ok(ShortenerEntry {
+          id: re.id,
+          url: url::Url::from_str(&re.url).context("Invalid URL in database")?,
+          creator: re.creator,
+          created: re.created.to_string(),
+        })
+      })
+      .collect::<Result<Vec<_>>>()
+      .map_err(|e| {
+        error!("Failed to get entries: {}", e);
+        Status::InternalServerError
+      })?,
+  }))
 }
 
 #[post("/api/shorten", format = "json", data = "<request>")]
@@ -233,5 +313,5 @@ async fn rocket() -> _ {
   rocket::custom(figment)
     .manage(db)
     .register("/", catchers![default_catcher])
-    .mount("/", routes![code, add, new, root])
+    .mount("/", routes![code, add, new, root, list])
 }
