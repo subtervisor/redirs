@@ -334,7 +334,8 @@ fn main() -> Result<()> {
             if let Ok(mut entries) = serde_json::from_str::<ShortenerEntries>(result_str) {
                 for entry in entries.entries.drain(..) {
                     println!(
-                        "{} => {} (created by {} on {})",
+                        "{}{} => {} (created by {} on {})",
+                        config.host.as_ref().unwrap().to_string(),
                         entry.id,
                         entry.url.to_string(),
                         entry.creator,
