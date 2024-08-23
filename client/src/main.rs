@@ -324,7 +324,7 @@ fn main() -> Result<()> {
                 .post(api_url)
                 .json(&request)
                 .send()
-                .context("Failed to send registration request")?;
+                .context("Failed to send list request")?;
             let result_bytes = http_result
                 .bytes()
                 .context("Failed to get response bytes")?;
@@ -349,7 +349,7 @@ fn main() -> Result<()> {
                         result.result
                     );
                 } else {
-                    anyhow::bail!("Failed to register: {}", result.result)
+                    anyhow::bail!("Failed to get list: {}", result.result)
                 }
             } else {
                 anyhow::bail!("Got bad response: {}", result_str);
