@@ -52,6 +52,9 @@ enum Command {
         /// Offset from beginning of URLs to retrieve
         #[clap(long, short, default_value_t = 0)]
         offset: u32,
+        /// Display in a pretty table view. Wraps content inside the table, so may break terminal link detection.
+        #[clap(long, short, default_value_t = false)]
+        table_view: bool,
     },
 }
 
@@ -295,8 +298,15 @@ fn main() -> Result<()> {
                 anyhow::bail!("Failed to register: {}", result.result)
             }
         },
-        Command::List { count, offset } => {
-            debug!("Fetching URLs: Count {}, Offset {}", count, offset);
+        Command::List {
+            count,
+            offset,
+            table_view,
+        } => {
+            debug!(
+                "Fetching URLs: Count {}, Offset {}, Table View {}",
+                count, offset, table_view
+            );
             if config.key.is_none() || config.uid.is_none() {
                 error!("Incomplete configuration specified.");
                 exit(1);
@@ -332,15 +342,43 @@ fn main() -> Result<()> {
                 str::from_utf8(&result_bytes).context("Failed to parse response as UTF-8")?;
             debug!("Raw response: {}", result_str);
             if let Ok(mut entries) = serde_json::from_str::<ShortenerEntries>(result_str) {
-                for entry in entries.entries.drain(..) {
-                    println!(
-                        "{}{} => {} (created by {} on {})",
-                        config.host.as_ref().unwrap().to_string(),
-                        entry.id,
-                        entry.url.to_string(),
-                        entry.creator,
-                        entry.created
-                    );
+                if table_view {
+                    use comfy_table::presets::UTF8_BORDERS_ONLY;
+                    use comfy_table::*;
+
+                    let host_str = config.host.as_ref().unwrap().to_string();
+                    let mut table = Table::new();
+                    table
+                        .load_preset(UTF8_BORDERS_ONLY)
+                        .set_content_arrangement(ContentArrangement::Dynamic)
+                        .set_header(vec![
+                            Cell::new("Short URL").add_attribute(Attribute::Bold),
+                            Cell::new("Target").add_attribute(Attribute::Bold),
+                            Cell::new("Creator").add_attribute(Attribute::Bold),
+                            Cell::new("Timestamp").add_attribute(Attribute::Bold),
+                        ])
+                        .add_rows(entries.entries.drain(..).map(|entry| {
+                            let mut short_url = host_str.clone();
+                            short_url.push_str(&entry.id);
+                            vec![
+                                short_url,
+                                entry.url.as_str().to_string(),
+                                entry.creator,
+                                entry.created,
+                            ]
+                        }));
+                    println!("{table}");
+                } else {
+                    for entry in entries.entries.drain(..) {
+                        println!(
+                            "{}{} => {} (created by {} on {})",
+                            config.host.as_ref().unwrap().to_string(),
+                            entry.id,
+                            entry.url.to_string(),
+                            entry.creator,
+                            entry.created
+                        );
+                    }
                 }
             } else if let Ok(result) = serde_json::from_str::<ShortenerResult>(result_str) {
                 if result.status == "success" {
